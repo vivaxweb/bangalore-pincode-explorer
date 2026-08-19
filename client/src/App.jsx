@@ -1,15 +1,16 @@
 import { useState, useEffect } from 'react'
 import SearchBar from './components/SearchBar'
 import ResultCard from './components/ResultCard'
+import MapView from './components/MapView'
 import './index.css'
 
 function App() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
   const [loading, setLoading] = useState(false)
+  const [selectedPincode, setSelectedPincode] = useState(null)
 
   useEffect(() => {
-    // Initial fetch of some data
     const fetchInitialData = async () => {
       setLoading(true)
       try {
@@ -42,7 +43,7 @@ function App() {
       } finally {
         setLoading(false)
       }
-    }, 300) // Debounce for 300ms
+    }, 300)
 
     return () => clearTimeout(delayDebounceFn)
   }, [query])
@@ -52,32 +53,43 @@ function App() {
       <div className="bg-orb bg-orb-1"></div>
       <div className="bg-orb bg-orb-2"></div>
       
-      <div className="app-container">
+      <div className="app-wrapper">
         <header>
-          <h1>Bangalore Pincodes</h1>
-          <p className="subtitle">Explore areas and postal codes effortlessly</p>
+          <h1>Bangalore Pincode Explorer</h1>
+          <p className="subtitle">Premium Interactive Map Dashboard</p>
         </header>
 
-        <main>
-          <SearchBar query={query} setQuery={setQuery} />
-          
-          <div className="results-container mt-4">
-            {loading ? (
-              <div className="loading">
-                <div className="spinner"></div>
-              </div>
-            ) : results.length > 0 ? (
-              results.map((item, index) => (
-                <div key={item.id} style={{ animationDelay: `${index * 0.05}s` }}>
-                  <ResultCard pincode={item.pincode} area={item.area} />
+        <main className="dashboard-grid">
+          {/* Sidebar with search and results */}
+          <section className="glass-panel sidebar">
+            <SearchBar query={query} setQuery={setQuery} />
+            
+            <div className="results-container">
+              {loading ? (
+                <div className="empty-state">Searching...</div>
+              ) : results.length > 0 ? (
+                results.map((item, index) => (
+                  <div key={item.id} style={{ animationDelay: `${index * 0.05}s` }}>
+                    <ResultCard 
+                      pincode={item.pincode} 
+                      area={item.area} 
+                      isActive={selectedPincode?.id === item.id}
+                      onClick={() => setSelectedPincode(item)}
+                    />
+                  </div>
+                ))
+              ) : (
+                <div className="empty-state">
+                  <p>No areas or pincodes found for "{query}"</p>
                 </div>
-              ))
-            ) : (
-              <div className="glass empty-state">
-                <p>No areas or pincodes found for "{query}"</p>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          </section>
+
+          {/* Map Area */}
+          <section className="glass-panel map-container">
+             <MapView results={results} selectedPincode={selectedPincode} />
+          </section>
         </main>
       </div>
     </>
