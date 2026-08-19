@@ -4,56 +4,106 @@
 ![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)
 ![Node.js](https://img.shields.io/badge/Node.js-43853D?style=for-the-badge&logo=node.js&logoColor=white)
 ![SQLite](https://img.shields.io/badge/SQLite-07405E?style=for-the-badge&logo=sqlite&logoColor=white)
+![Responsive](https://img.shields.io/badge/Responsive-Mobile%20Ready-blue?style=for-the-badge&logo=css3)
 
-A full-stack web application designed to explore Bangalore areas and pincodes. This project satisfies the internship assignment requirements using a modern tech stack, a highly interactive map, and a premium "soft-UI" aesthetic.
+A full-stack, **fully responsive** web application designed to explore Bangalore areas by pincode. Built for the internship assignment using a modern tech stack with a premium dashboard UI.
 
 **🚀 Live Demo:** [https://bangalore-pincode-explorer-9lzq.onrender.com/](https://bangalore-pincode-explorer-9lzq.onrender.com/)
+
+> ⚠️ Hosted on Render's free tier — may take ~45 seconds to wake up on the very first visit.
 
 ---
 
 ## ✨ Features
 
-- **Premium Soft-UI Dashboard:** Built with modern design principles featuring clean typography, glassmorphism cards, and soft dynamic shadows.
-- **Interactive Map Integration:** Powered by `react-leaflet` with a custom light theme (CartoDB Positron) and pure CSS HTML markers.
-- **Geolocated Data:** Click on any location card and the map smoothly animates and flies directly to the precise GPS coordinates.
-- **Full-Stack Architecture:** 
-  - **Frontend:** React (Vite) for blazing fast performance.
-  - **Backend:** Node.js / Express REST API serving static files in production.
-  - **Database:** SQLite3 with an automated initialization and seeding script (`db.js`).
+### 🗺️ Interactive Map
+- Powered by `react-leaflet` with the CartoDB Positron (light) tile layer
+- Custom CSS markers that highlight when a location is selected
+- Smooth "fly-to" animation when clicking a result
+
+### 🔍 Smart Search
+- Real-time, debounced search across **pincode** and **area name**
+- Dropdown shows Post Office name alongside the area for immediate context
+- Clear (✕) button to reset instantly
+
+### 📮 Real Post Office Data
+- **Post Office Name**, **Office Type** (Head / Sub / Branch Office)
+- **Delivery Status**, **District**, **State / Circle**, **Division**
+- Data for **24 Bangalore pincodes** (560001–560095)
+
+### ⚡ Working Action Buttons
+- **Copy PIN** — copies pincode to clipboard with feedback
+- **Google Maps** — opens the exact area in Google Maps
+- **Street View** — opens Google Street View at the GPS coordinates
+- **Track Mail** — links to India Post's official tracking portal
+
+### 📖 Area Overview (Live Wikipedia)
+- Fetches a real Wikipedia article summary for the selected neighborhood
+- Displays the authentic Wikipedia thumbnail photo of the area
+- Falls back gracefully if no article is found
+
+### 📱 Fully Responsive Design
+- **Desktop:** Two-panel dashboard — sidebar + map on top + detail cards below
+- **Tablet (≤1024px):** Compact layout, adjusted grid and buttons
+- **Mobile (≤768px):** Single-column layout, map on top, scrollable cards below, sidebar converts to a **fixed bottom navigation bar** (mobile-app style)
+- **Small Phone (≤420px):** Single-column post office grid, full-width action buttons
+
+---
 
 ## 🛠️ Tech Stack
 
-- **Frontend:** React.js, React-Leaflet, Vanilla CSS
-- **Backend:** Node.js, Express.js
-- **Database:** SQLite3
-- **Deployment:** Render (Single Service Web App)
+| Layer | Technology |
+|---|---|
+| Frontend | React 18 (Vite), react-leaflet, Vanilla CSS |
+| Backend | Node.js, Express 4 |
+| Database | SQLite3 (auto-seeded on boot) |
+| Map Tiles | CartoDB Positron (OpenStreetMap) |
+| External APIs | Wikipedia REST API (live area summaries & photos) |
+| Deployment | Render (Single Web Service) |
 
 ---
 
 ## 💻 Local Installation
 
-If you would like to run this project locally on your machine, follow these steps:
-
 ### Prerequisites
-- [Node.js](https://nodejs.org/) (v18 or higher recommended)
+- [Node.js](https://nodejs.org/) v18 or higher
 
-### 1. Setup Backend
-Open a terminal and navigate to the `server` directory:
+### 1. Clone & Setup Backend
 ```bash
-cd server
+git clone https://github.com/vivaxweb/bangalore-pincode-explorer.git
+cd bangalore-pincode-explorer/server
 npm install
 npm start
 ```
-*Note: The server automatically initializes and seeds the SQLite database (`pincodes.db`) upon startup.*
+*The server starts on `http://localhost:5000` and auto-seeds the SQLite database.*
 
-### 2. Setup Frontend
-Open a new terminal window and navigate to the `client` directory:
+### 2. Setup Frontend (new terminal)
 ```bash
-cd client
+cd ../client
 npm install
 npm run dev
 ```
-The React frontend will be available at `http://localhost:5173`. Open this URL in your browser to explore the app!
+Open `http://localhost:5173` in your browser.
 
 ---
-*Built as a showcase for full-stack engineering and UX/UI design.*
+
+## 📁 Project Structure
+
+```
+bangalore-pincode-explorer/
+├── client/              # React frontend (Vite)
+│   ├── src/
+│   │   ├── App.jsx      # Main component, search, Wikipedia API
+│   │   ├── index.css    # All styles incl. responsive breakpoints
+│   │   └── components/
+│   │       ├── MapView.jsx    # react-leaflet map + markers
+│   │       └── SearchBar.jsx
+│   └── index.html
+└── server/              # Node.js + Express backend
+    ├── index.js         # REST API endpoints
+    └── db.js            # SQLite init + auto-seeding
+```
+
+---
+
+*Built as a showcase for full-stack engineering, responsive design, and third-party API integration.*

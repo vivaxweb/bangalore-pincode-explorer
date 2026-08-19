@@ -484,13 +484,148 @@ body {
   transform: scale(1.4);
 }
 
-/* Responsive */
-@media (max-width: 900px) {
-  body { overflow: auto; }
-  .app-container { flex-direction: column; height: auto; padding: 1rem; }
-  .sidebar-nav { width: 100%; flex-direction: row; height: 60px; padding: 0 1rem; border-radius: var(--radius-sm); }
-  .logo-mark { margin-bottom: 0; }
-  .top-section { height: 50vh; flex: none; }
-  .bottom-section { flex-direction: column; overflow: visible; }
-  .floating-search { width: calc(100% - 2.5rem); }
+/* ============================================
+   RESPONSIVE — TABLET (≤ 1024px)
+   ============================================ */
+@media (max-width: 1024px) {
+  .po-grid { grid-template-columns: 1fr 1fr; }
+  .action-row { gap: 0.4rem; }
+  .action-btn { font-size: 0.75rem; padding: 0.5rem 0.75rem; }
+  .map-stat-pill { padding: 0.4rem 0.65rem; }
+  .map-stat-value { font-size: 0.8rem; }
+}
+
+/* ============================================
+   RESPONSIVE — MOBILE (≤ 768px)
+   ============================================ */
+@media (max-width: 768px) {
+  body { overflow-y: auto; overflow-x: hidden; }
+
+  .app-container {
+    flex-direction: column;
+    height: auto;
+    min-height: 100vh;
+    padding: 0;
+    gap: 0;
+    padding-bottom: 72px; /* space for bottom nav */
+  }
+
+  /* Sidebar becomes a bottom navigation bar */
+  .sidebar-nav {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    height: 64px;
+    flex-direction: row;
+    justify-content: space-around;
+    align-items: center;
+    padding: 0 1.5rem;
+    border-radius: 0;
+    background: #1e293b;
+    z-index: 2000;
+    box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+  }
+
+  .logo-mark { display: none; }
+
+  .nav-item {
+    flex: 1;
+    height: 48px;
+    border-radius: 10px;
+  }
+
+  /* Main content fills full width */
+  .main-content {
+    gap: 0;
+    flex: none;
+  }
+
+  /* Map takes 50% viewport height */
+  .top-section {
+    flex: none;
+    height: 52vh;
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  /* Floating search fills width */
+  .floating-search {
+    left: 0.75rem;
+    right: 0.75rem;
+    width: auto;
+    border-radius: 12px;
+    top: 0.75rem;
+  }
+
+  /* Map stats on mobile: hide to save space */
+  .map-stats-overlay { display: none; }
+
+  /* Bottom cards scroll vertically */
+  .bottom-section {
+    flex-direction: column;
+    overflow: visible;
+    padding: 1rem;
+    gap: 1rem;
+  }
+
+  .info-card {
+    flex: none;
+    border-radius: var(--radius-sm);
+  }
+
+  .info-card:first-child { flex: none; }
+  .wiki-card { flex: none; max-height: none; overflow: visible; }
+  .empty-card { min-height: 200px; }
+
+  /* Post Office grid: single column on small screens */
+  .po-grid { grid-template-columns: 1fr 1fr; gap: 0.5rem; }
+
+  /* Action buttons: 2-per-row grid */
+  .action-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+  }
+
+  .action-btn {
+    justify-content: center;
+    padding: 0.65rem 0.5rem;
+    font-size: 0.82rem;
+  }
+
+  .primary-btn { grid-column: span 2; }
+
+  .card-title { font-size: 0.95rem; }
+
+  .wiki-thumb-container { height: 150px; }
+
+  /* Search dropdown full width */
+  .search-dropdown {
+    position: fixed;
+    left: 0.75rem;
+    right: 0.75rem;
+    top: auto;
+    margin-top: 0;
+  }
+
+  /* Area chips on empty state */
+  .area-chips { gap: 0.4rem; }
+  .area-chip { font-size: 0.75rem; padding: 0.35rem 0.7rem; }
+}
+
+/* ============================================
+   RESPONSIVE — SMALL PHONE (≤ 420px)
+   ============================================ */
+@media (max-width: 420px) {
+  .po-grid { grid-template-columns: 1fr; }
+  .action-row { grid-template-columns: 1fr; }
+  .primary-btn { grid-column: span 1; }
+  .top-section { height: 45vh; }
+  .floating-search { top: 0.5rem; left: 0.5rem; right: 0.5rem; }
+  .bottom-section { padding: 0.75rem; }
+  .info-card { padding: 1.1rem; }
+  .card-title { font-size: 0.9rem; }
+  .wiki-thumb-container { height: 120px; }
 }
