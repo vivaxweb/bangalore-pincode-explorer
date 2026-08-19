@@ -44,6 +44,15 @@ app.get('/api/pincodes', (req, res) => {
     });
 });
 
+// Serve static files from the React frontend app
+const path = require('path');
+app.use(express.static(path.join(__dirname, '../client/dist')));
+
+// Catch-all route to serve the React index.html
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/dist/index.html'));
+});
+
 app.listen(PORT, () => {
     console.log(`Server is running on http://localhost:${PORT}`);
 });

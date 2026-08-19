@@ -13,7 +13,7 @@ function App() {
     const fetchInitialData = async () => {
       setLoading(true)
       try {
-        const res = await fetch('http://localhost:5000/api/pincodes')
+        const res = await fetch('/api/pincodes')
         const data = await res.json()
         setResults(data.data || [])
       } catch (err) {
@@ -34,7 +34,7 @@ function App() {
     const delayDebounceFn = setTimeout(async () => {
       setLoading(true)
       try {
-        const res = await fetch(`http://localhost:5000/api/pincodes/search?q=${query}`)
+        const res = await fetch(`/api/pincodes/search?q=${query}`)
         const data = await res.json()
         setResults(data.data || [])
       } catch (err) {
