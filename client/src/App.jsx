@@ -7,6 +7,8 @@ function App() {
   const [results, setResults] = useState([])
   const [selectedPincode, setSelectedPincode] = useState(null)
   const [showDropdown, setShowDropdown] = useState(false)
+  const [realImage, setRealImage] = useState(null)
+  const [loadingImage, setLoadingImage] = useState(false)
 
   // Fetch initial data for the map pins
   useEffect(() => {
@@ -46,6 +48,59 @@ function App() {
     return () => clearTimeout(delayDebounceFn)
   }, [query])
 
+  // Fetch Real Image from Wikipedia when area is selected
+  useEffect(() => {
+    if (!selectedPincode) return;
+    
+    const fetchRealImage = async () => {
+      setLoadingImage(true);
+      setRealImage(null);
+      try {
+        // Extract the main area name (before any comma)
+        const mainArea = selectedPincode.area.split(',')[0].trim();
+        
+        // Wikipedia API to get the main image of the page
+        const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(mainArea)}&origin=*`;
+        
+        const res = await fetch(wikiUrl);
+        const data = await res.json();
+        
+        const pages = data.query?.pages;
+        if (pages) {
+          const pageId = Object.keys(pages)[0];
+          if (pageId !== '-1' && pages[pageId].original?.source) {
+            setRealImage(pages[pageId].original.source);
+            setLoadingImage(false);
+            return;
+          }
+        }
+        
+        // Try appending "Bangalore" if first query fails
+        const wikiUrl2 = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(mainArea + ', Bangalore')}&origin=*`;
+        const res2 = await fetch(wikiUrl2);
+        const data2 = await res2.json();
+        const pages2 = data2.query?.pages;
+        
+        if (pages2) {
+          const pageId2 = Object.keys(pages2)[0];
+          if (pageId2 !== '-1' && pages2[pageId2].original?.source) {
+            setRealImage(pages2[pageId2].original.source);
+          } else {
+            // Fallback to a real Post Office image if Wikipedia has no photo
+            setRealImage('https://images.unsplash.com/photo-1596720426673-e4e14290f0cc?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch image from Wikipedia", err);
+        setRealImage('https://images.unsplash.com/photo-1596720426673-e4e14290f0cc?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');
+      } finally {
+        setLoadingImage(false);
+      }
+    };
+
+    fetchRealImage();
+  }, [selectedPincode]);
+
   const handleSelect = (item) => {
     setSelectedPincode(item)
     setShowDropdown(false)
@@ -60,23 +115,12 @@ function App() {
       hash = pincodeStr.charCodeAt(i) + ((hash << 5) - hash);
     }
     const positiveHash = Math.abs(hash);
-    
-    // Array of high quality neighborhood/building images
-    const images = [
-      "https://images.unsplash.com/photo-1595844730298-b960fac0f15f?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", // Modern building
-      "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", // House with pool
-      "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", // Business district
-      "https://images.unsplash.com/photo-1577223625816-7546f13df25d?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", // Cozy street
-      "https://images.unsplash.com/photo-1582268611958-ebfd161ef9cf?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80", // Apartment complex
-      "https://images.unsplash.com/photo-1512917774080-9991f1c4c750?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80"  // Luxury home
-    ];
 
     return {
       age: (positiveHash % 30 + 1) + 'Y',
       visitors: ((positiveHash % 15000) + 1000).toLocaleString(),
       temp: (22 + (positiveHash % 10)) + '°C',
       members: ((positiveHash % 90) / 10 + 1).toFixed(1) + 'k',
-      image: images[positiveHash % images.length]
     };
   }
 
@@ -161,9 +205,20 @@ function App() {
                 </div>
               </div>
               
-              {/* Dynamic Image Card */}
-              <div className="info-card" style={{ padding: 0, overflow: 'hidden' }}>
-                <img src={dynamicStats.image} alt="Neighborhood" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              {/* Real Wikipedia Image Card */}
+              <div className="info-card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
+                {loadingImage ? (
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: 'var(--text-muted)' }}>
+                    Loading Area Photo...
+                  </div>
+                ) : (
+                  <>
+                    <img src={realImage} alt={selectedPincode.area} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                    <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(255,255,255,0.8)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.6rem', color: '#000' }}>
+                      Real Location Photo
+                    </div>
+                  </>
+                )}
               </div>
 
               {/* Tenants / Community Card */}
