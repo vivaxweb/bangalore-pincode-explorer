@@ -2,246 +2,283 @@ import { useState, useEffect } from 'react'
 import MapView from './components/MapView'
 import './index.css'
 
+// Icon components (inline SVG to avoid dependencies)
+const Icon = ({ d, size = 18, color = 'currentColor', fill = 'none' }) => (
+  <svg xmlns="http://www.w3.org/2000/svg" width={size} height={size} viewBox="0 0 24 24" fill={fill} stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+    <path d={d} />
+  </svg>
+)
+
 function App() {
   const [query, setQuery] = useState('')
   const [results, setResults] = useState([])
-  const [selectedPincode, setSelectedPincode] = useState(null)
+  const [selectedPin, setSelectedPin] = useState(null)
   const [showDropdown, setShowDropdown] = useState(false)
-  const [realImage, setRealImage] = useState(null)
-  const [loadingImage, setLoadingImage] = useState(false)
+  const [wikiSummary, setWikiSummary] = useState(null)
+  const [wikiLoading, setWikiLoading] = useState(false)
+  const [copied, setCopied] = useState(false)
 
-  // Fetch initial data for the map pins
+  // Fetch all pins on load
   useEffect(() => {
-    const fetchInitialData = async () => {
-      try {
-        const res = await fetch('/api/pincodes')
-        const data = await res.json()
-        setResults(data.data || [])
-      } catch (err) {
-        console.error("Failed to fetch initial data", err)
-      }
-    }
-    
-    if (query === '') {
-      fetchInitialData()
-    }
+    if (query !== '') return
+    fetch('/api/pincodes')
+      .then(r => r.json())
+      .then(d => setResults(d.data || []))
+      .catch(console.error)
   }, [query])
 
-  // Search functionality
+  // Search debounce
   useEffect(() => {
-    if (!query) {
-      setShowDropdown(false)
-      return;
-    }
-
-    const delayDebounceFn = setTimeout(async () => {
-      try {
-        const res = await fetch(`/api/pincodes/search?q=${query}`)
-        const data = await res.json()
-        setResults(data.data || [])
-        setShowDropdown(true)
-      } catch (err) {
-        console.error("Failed to search", err)
-      }
+    if (!query) { setShowDropdown(false); return }
+    const t = setTimeout(() => {
+      fetch(`/api/pincodes/search?q=${query}`)
+        .then(r => r.json())
+        .then(d => { setResults(d.data || []); setShowDropdown(true) })
+        .catch(console.error)
     }, 300)
-
-    return () => clearTimeout(delayDebounceFn)
+    return () => clearTimeout(t)
   }, [query])
 
-  // Fetch Real Image from Wikipedia when area is selected
+  // Fetch Wikipedia summary when area is selected
   useEffect(() => {
-    if (!selectedPincode) return;
-    
-    const fetchRealImage = async () => {
-      setLoadingImage(true);
-      setRealImage(null);
-      try {
-        // Extract the main area name (before any comma)
-        const mainArea = selectedPincode.area.split(',')[0].trim();
-        
-        // Wikipedia API to get the main image of the page
-        const wikiUrl = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(mainArea)}&origin=*`;
-        
-        const res = await fetch(wikiUrl);
-        const data = await res.json();
-        
-        const pages = data.query?.pages;
-        if (pages) {
-          const pageId = Object.keys(pages)[0];
-          if (pageId !== '-1' && pages[pageId].original?.source) {
-            setRealImage(pages[pageId].original.source);
-            setLoadingImage(false);
-            return;
-          }
-        }
-        
-        // Try appending "Bangalore" if first query fails
-        const wikiUrl2 = `https://en.wikipedia.org/w/api.php?action=query&prop=pageimages&format=json&piprop=original&titles=${encodeURIComponent(mainArea + ', Bangalore')}&origin=*`;
-        const res2 = await fetch(wikiUrl2);
-        const data2 = await res2.json();
-        const pages2 = data2.query?.pages;
-        
-        if (pages2) {
-          const pageId2 = Object.keys(pages2)[0];
-          if (pageId2 !== '-1' && pages2[pageId2].original?.source) {
-            setRealImage(pages2[pageId2].original.source);
-          } else {
-            // Fallback to a real Post Office image if Wikipedia has no photo
-            setRealImage('https://images.unsplash.com/photo-1596720426673-e4e14290f0cc?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');
-          }
-        }
-      } catch (err) {
-        console.error("Failed to fetch image from Wikipedia", err);
-        setRealImage('https://images.unsplash.com/photo-1596720426673-e4e14290f0cc?ixlib=rb-4.0.3&auto=format&fit=crop&w=800&q=80');
-      } finally {
-        setLoadingImage(false);
-      }
-    };
+    if (!selectedPin) return
+    setWikiSummary(null)
+    setWikiLoading(true)
+    const mainArea = selectedPin.area.split(',')[0].trim()
 
-    fetchRealImage();
-  }, [selectedPincode]);
+    const tryFetch = async (title) => {
+      const r = await fetch(`https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`)
+      if (!r.ok) throw new Error('not found')
+      const d = await r.json()
+      if (d.type === 'disambiguation') throw new Error('disambiguation')
+      return d
+    }
+
+    tryFetch(mainArea)
+      .catch(() => tryFetch(`${mainArea}, Bangalore`))
+      .then(d => setWikiSummary(d))
+      .catch(() => setWikiSummary(null))
+      .finally(() => setWikiLoading(false))
+  }, [selectedPin])
 
   const handleSelect = (item) => {
-    setSelectedPincode(item)
+    setSelectedPin(item)
     setShowDropdown(false)
     setQuery(item.pincode)
   }
 
-  // Helper to generate deterministic data based on pincode string
-  const generateStats = (pincodeStr) => {
-    if (!pincodeStr) return null;
-    let hash = 0;
-    for (let i = 0; i < pincodeStr.length; i++) {
-      hash = pincodeStr.charCodeAt(i) + ((hash << 5) - hash);
-    }
-    const positiveHash = Math.abs(hash);
-
-    return {
-      age: (positiveHash % 30 + 1) + 'Y',
-      visitors: ((positiveHash % 15000) + 1000).toLocaleString(),
-      temp: (22 + (positiveHash % 10)) + '°C',
-      members: ((positiveHash % 90) / 10 + 1).toFixed(1) + 'k',
-    };
+  const copyPincode = () => {
+    navigator.clipboard.writeText(selectedPin.pincode)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
-  const dynamicStats = generateStats(selectedPincode?.pincode);
+  const openGoogleMaps = () => {
+    const url = `https://www.google.com/maps/search/${encodeURIComponent(selectedPin.area + ', Bangalore')}/@${selectedPin.lat},${selectedPin.lng},14z`
+    window.open(url, '_blank')
+  }
+
+  const openStreetView = () => {
+    const url = `https://www.google.com/maps/@?api=1&map_action=pano&viewpoint=${selectedPin.lat},${selectedPin.lng}`
+    window.open(url, '_blank')
+  }
+
+  const openIndiaPost = () => {
+    window.open(`https://www.indiapost.gov.in/_layouts/15/dop.portal.tracking/trackconsignment.aspx`, '_blank')
+  }
+
+  const openWikipedia = () => {
+    if (wikiSummary?.content_urls?.desktop?.page)
+      window.open(wikiSummary.content_urls.desktop.page, '_blank')
+  }
 
   return (
     <div className="app-container">
-      {/* Sidebar Navigation */}
+      {/* Sidebar */}
       <nav className="sidebar-nav">
-        <div className="logo-placeholder"></div>
-        {/* Dummy icons to match inspiration */}
-        <div className="nav-icon active" style={{mask: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpath d=\'m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\'/%3E%3Cpolyline points=\'9 22 9 12 15 12 15 22\'/%3E%3C/svg%3E") no-repeat center / contain', backgroundColor: 'var(--text-main)'}}></div>
-        <div className="nav-icon" style={{mask: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Cpath d=\'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z\'/%3E%3Ccircle cx=\'12\' cy=\'10\' r=\'3\'/%3E%3C/svg%3E") no-repeat center / contain', backgroundColor: 'var(--text-muted)'}}></div>
-        <div className="nav-icon" style={{mask: 'url("data:image/svg+xml,%3Csvg xmlns=\'http://www.w3.org/2000/svg\' viewBox=\'0 0 24 24\' fill=\'none\' stroke=\'currentColor\' stroke-width=\'2\' stroke-linecap=\'round\' stroke-linejoin=\'round\'%3E%3Crect x=\'3\' y=\'3\' width=\'18\' height=\'18\' rx=\'2\' ry=\'2\'/%3E%3Cline x1=\'3\' y1=\'9\' x2=\'21\' y2=\'9\'/%3E%3Cline x1=\'9\' y1=\'21\' x2=\'9\' y2=\'9\'/%3E%3C/svg%3E") no-repeat center / contain', backgroundColor: 'var(--text-muted)'}}></div>
+        <div className="logo-mark">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="white" stroke="white" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3" fill="black" stroke="none"/>
+          </svg>
+        </div>
+        <div className="nav-item active" title="Explorer">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>
+        </div>
+        <div className="nav-item" title="Map" onClick={() => setSelectedPin(null)}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+        </div>
+        <div className="nav-item" title="India Post" onClick={openIndiaPost}>
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+        </div>
       </nav>
 
       <main className="main-content">
-        {/* Top Section: Map with Floating Search */}
+        {/* Map Section */}
         <section className="top-section">
-          {/* Floating Search Bar */}
           <div className="floating-search">
-            <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <circle cx="11" cy="11" r="8"></circle>
-              <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
-            </svg>
-            <input 
-              type="text" 
+            <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input
+              type="text"
               className="search-input"
-              placeholder="Search pincode or area..." 
+              placeholder="Search pincode or area (e.g. 560034, Koramangala)..."
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              onFocus={() => { if(query) setShowDropdown(true) }}
+              onFocus={() => { if (query) setShowDropdown(true) }}
+              onBlur={() => setTimeout(() => setShowDropdown(false), 200)}
             />
+            {query && <button className="clear-btn" onClick={() => { setQuery(''); setSelectedPin(null); }}>✕</button>}
             {showDropdown && results.length > 0 && (
               <div className="search-dropdown">
                 {results.map(item => (
-                  <div key={item.id} className="dropdown-item" onClick={() => handleSelect(item)}>
-                    <strong>{item.pincode}</strong> - {item.area}
+                  <div key={item.id} className="dropdown-item" onMouseDown={() => handleSelect(item)}>
+                    <span className="dd-pin">{item.pincode}</span>
+                    <span className="dd-area">{item.area}</span>
+                    <span className="dd-po">{item.post_office}</span>
                   </div>
                 ))}
               </div>
             )}
           </div>
 
+          {/* Map Stats Overlay */}
+          {selectedPin && (
+            <div className="map-stats-overlay">
+              <div className="map-stat-pill">
+                <span className="map-stat-label">Pincode</span>
+                <span className="map-stat-value">{selectedPin.pincode}</span>
+              </div>
+              <div className="map-stat-pill">
+                <span className="map-stat-label">Type</span>
+                <span className="map-stat-value">{selectedPin.office_type?.replace(' Office','')}</span>
+              </div>
+              <div className="map-stat-pill">
+                <span className="map-stat-label">Delivery</span>
+                <span className="map-stat-value" style={{color: '#22c55e'}}>✓ Active</span>
+              </div>
+            </div>
+          )}
+
           <div className="map-wrapper">
-             <MapView 
-                results={results} 
-                selectedPincode={selectedPincode} 
-                onMarkerClick={(item) => setSelectedPincode(item)}
-              />
+            <MapView results={results} selectedPincode={selectedPin} onMarkerClick={handleSelect} />
           </div>
         </section>
 
-        {/* Bottom Section: Details Cards */}
+        {/* Bottom Cards */}
         <section className="bottom-section">
-          {selectedPincode ? (
+          {selectedPin ? (
             <>
-              {/* Location Card */}
+              {/* Card 1: Post Office Details */}
               <div className="info-card">
                 <div className="card-header">
-                  <span className="card-title">Location Snapshot</span>
-                  <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="var(--accent)" stroke="var(--accent)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path></svg>
-                </div>
-                <div className="location-details">
-                  <strong>Pincode:</strong> {selectedPincode.pincode}<br/>
-                  <strong>Area:</strong> {selectedPincode.area}<br/>
-                  Bangalore, Karnataka
-                </div>
-                <div className="stats-row">
-                  <div className="stat-box">
-                    <div className="stat-label">Avg Est. Age</div>
-                    <div className="stat-value">{dynamicStats.age}</div>
-                  </div>
-                  <div className="stat-box">
-                    <div className="stat-label">Daily Footfall</div>
-                    <div className="stat-value">{dynamicStats.visitors}</div>
-                  </div>
-                  <div className="stat-box">
-                    <div className="stat-label">Local Temp</div>
-                    <div className="stat-value">{dynamicStats.temp}</div>
-                  </div>
-                </div>
-              </div>
-              
-              {/* Real Wikipedia Image Card */}
-              <div className="info-card" style={{ padding: 0, overflow: 'hidden', position: 'relative' }}>
-                {loadingImage ? (
-                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f8fafc', color: 'var(--text-muted)' }}>
-                    Loading Area Photo...
-                  </div>
-                ) : (
-                  <>
-                    <img src={realImage} alt={selectedPincode.area} style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                    <div style={{ position: 'absolute', bottom: '8px', right: '8px', background: 'rgba(255,255,255,0.8)', padding: '2px 6px', borderRadius: '4px', fontSize: '0.6rem', color: '#000' }}>
-                      Real Location Photo
+                  <div className="card-title-row">
+                    <div className="card-icon-wrap" style={{background: '#fff7ed'}}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
                     </div>
-                  </>
-                )}
+                    <span className="card-title">Post Office Info</span>
+                  </div>
+                  <span className={`delivery-badge ${selectedPin.delivery_status === 'Delivery' ? 'badge-green' : 'badge-gray'}`}>
+                    {selectedPin.delivery_status}
+                  </span>
+                </div>
+
+                <div className="po-grid">
+                  <div className="po-field">
+                    <div className="po-label">Post Office</div>
+                    <div className="po-value">{selectedPin.post_office}</div>
+                  </div>
+                  <div className="po-field">
+                    <div className="po-label">Office Type</div>
+                    <div className="po-value">{selectedPin.office_type}</div>
+                  </div>
+                  <div className="po-field">
+                    <div className="po-label">District</div>
+                    <div className="po-value">{selectedPin.district}</div>
+                  </div>
+                  <div className="po-field">
+                    <div className="po-label">State / Circle</div>
+                    <div className="po-value">{selectedPin.state}</div>
+                  </div>
+                  <div className="po-field">
+                    <div className="po-label">PIN Code</div>
+                    <div className="po-value po-pincode">{selectedPin.pincode}</div>
+                  </div>
+                  <div className="po-field">
+                    <div className="po-label">Division</div>
+                    <div className="po-value">Bangalore South</div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="action-row">
+                  <button className="action-btn primary-btn" onClick={copyPincode}>
+                    {copied ? '✓ Copied!' : '⎘ Copy PIN'}
+                  </button>
+                  <button className="action-btn secondary-btn" onClick={openGoogleMaps}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                    Google Maps
+                  </button>
+                  <button className="action-btn secondary-btn" onClick={openStreetView}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="10" r="3"/><path d="M7 20.662V19a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v1.662"/></svg>
+                    Street View
+                  </button>
+                  <button className="action-btn secondary-btn" onClick={openIndiaPost}>
+                    <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+                    Track Mail
+                  </button>
+                </div>
               </div>
 
-              {/* Tenants / Community Card */}
-              <div className="info-card">
+              {/* Card 2: Wikipedia Area Summary */}
+              <div className="info-card wiki-card">
                 <div className="card-header">
-                  <span className="card-title">Community Growth</span>
-                </div>
-                <div className="location-details">
-                  Join our growing network of active members and businesses in the {selectedPincode.area} district.
-                </div>
-                <div style={{ marginTop: 'auto', textAlign: 'center' }}>
-                  <div style={{ width: '100px', height: '100px', border: '8px solid var(--accent)', borderRadius: '50%', margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', borderTopColor: '#edf2f7', transition: 'all 0.5s ease-in-out' }}>
-                    <div style={{ textAlign: 'center' }}>
-                      <div style={{ fontSize: '1.2rem', fontWeight: 'bold', color: 'var(--text-main)' }}>{dynamicStats.members}</div>
-                      <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>active</div>
+                  <div className="card-title-row">
+                    <div className="card-icon-wrap" style={{background: '#f0fdf4'}}>
+                      <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
                     </div>
+                    <span className="card-title">Area Overview</span>
                   </div>
+                  {wikiSummary && (
+                    <button className="wiki-link-btn" onClick={openWikipedia}>Wikipedia ↗</button>
+                  )}
                 </div>
+
+                {wikiLoading ? (
+                  <div className="wiki-loading">
+                    <div className="loading-dots"><span/><span/><span/></div>
+                    <p>Fetching area info...</p>
+                  </div>
+                ) : wikiSummary ? (
+                  <>
+                    {wikiSummary.thumbnail?.source && (
+                      <div className="wiki-thumb-container">
+                        <img src={wikiSummary.thumbnail.source} alt={selectedPin.area} className="wiki-thumb" />
+                        <div className="wiki-thumb-overlay">
+                          <span>{selectedPin.area}</span>
+                        </div>
+                      </div>
+                    )}
+                    <p className="wiki-extract">{wikiSummary.extract}</p>
+                  </>
+                ) : (
+                  <div className="wiki-empty">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#cbd5e0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
+                    <p>No Wikipedia article found for this area.</p>
+                  </div>
+                )}
               </div>
             </>
           ) : (
-            <div className="info-card" style={{ alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-              Select a pin on the map or search to view area analytics
+            <div className="info-card empty-card">
+              <div className="empty-state-content">
+                <svg xmlns="http://www.w3.org/2000/svg" width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="#e2e8f0" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+                <h3>Select any area on the map</h3>
+                <p>Click a pin or search above to view post office details, area information, and quick actions.</p>
+                <div className="area-chips">
+                  {results.slice(0, 6).map(r => (
+                    <button key={r.id} className="area-chip" onClick={() => handleSelect(r)}>{r.area.split(',')[0]}</button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
         </section>
